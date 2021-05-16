@@ -1,0 +1,10 @@
+[package]
+name = "mirror"
+version = "0.1.0"
+authors = ["Ravern Koh <ravernkoh@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+hotwatch = "0.4.5"
+structopt = "0.3"
+thiserror = "1.0"
