@@ -51,10 +51,15 @@ pub fn run() -> Result<(), RunError> {
   } = Config::from_args();
 
   let device_addrs_clone = device_addrs.clone();
+  let sync_path_clone = sync_path.clone();
 
-  thread::spawn(move || watch(sync_path, device_addrs_clone).unwrap());
+  thread::spawn(move || watch(sync_path_clone, device_addrs_clone).unwrap());
 
-  Ok(server::listen(server::Config { port, device_addrs })?)
+  Ok(server::listen(server::Config {
+    sync_path,
+    port,
+    device_addrs,
+  })?)
 }
 
 fn watch(

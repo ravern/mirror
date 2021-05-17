@@ -1,6 +1,7 @@
 use std::{
-  io::{self, Read},
+  fs, io,
   net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
+  path::PathBuf,
   thread,
 };
 
@@ -14,32 +15,38 @@ pub enum Error {
   Io(#[from] io::Error),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Config {
+  pub sync_path: PathBuf,
   pub port: u16,
   pub device_addrs: Vec<String>,
 }
 
-pub fn handle(mut stream: TcpStream) {
+pub fn handle(config: Config, mut stream: TcpStream) {
   match Request::parse(&mut stream).expect("parse request failed") {
     Request::Put { path, contents } => {
       println!("PUT {:?} {}", path, contents);
+      let mut absolute_path = config.sync_path.clone();
+      absolute_path.push(path);
+      fs::write(absolute_path, contents).expect("failed to write file");
     }
     Request::Del { path } => {
       println!("DEL {:?}", path);
+      let mut absolute_path = config.sync_path.clone();
+      absolute_path.push(path);
+      fs::remove_file(absolute_path).expect("failed to delete file");
     }
   }
 }
 
 pub fn listen(config: Config) -> Result<(), Error> {
-  let Config { port, device_addrs } = config;
-
-  let listener = TcpListener::bind(format!("0.0.0.0:{}", port))?;
+  let listener = TcpListener::bind(format!("0.0.0.0:{}", &config.port))?;
 
   loop {
     let (stream, addr) = listener.accept()?;
-    if is_device(&device_addrs, addr)? {
-      thread::spawn(move || handle(stream));
+    if is_device(&config.device_addrs, addr)? {
+      let config_clone = config.clone();
+      thread::spawn(move || handle(config_clone, stream));
     } else {
       println!("not in device list. blocked!")
     }
