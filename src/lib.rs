@@ -1,7 +1,8 @@
 use std::{
+  collections::HashMap,
   fs::read_to_string,
-  io::{self, Read, Write},
-  net::{TcpListener, TcpStream},
+  io::{self, Write},
+  net::TcpStream,
   path::PathBuf,
   thread,
 };
@@ -12,6 +13,11 @@ use hotwatch::{
 };
 use structopt::StructOpt;
 use thiserror::Error;
+
+use crate::net::{Client, Request};
+
+mod net;
+mod server;
 
 #[derive(Debug, StructOpt)]
 #[structopt()]
@@ -30,6 +36,8 @@ struct Config {
 pub enum RunError {
   #[error("{0}")]
   Io(#[from] io::Error),
+  #[error("{0}")]
+  Server(#[from] server::Error),
   #[error("failed to start watcher: {0}")]
   Hotwatch(#[from] hotwatch::Error),
 }
@@ -44,48 +52,46 @@ pub fn run() -> Result<(), RunError> {
 
   let device_addrs_clone = device_addrs.clone();
 
-  let listen_handle = thread::spawn(move || listen(port, device_addrs));
-  let watch_handle =
-    thread::spawn(move || watch(sync_path, device_addrs_clone));
+  thread::spawn(move || watch(sync_path, device_addrs_clone).unwrap());
 
-  listen_handle.join().unwrap()?;
-  watch_handle.join().unwrap()?;
-
-  Ok(())
-}
-
-fn listen(port: u16, device_addrs: Vec<String>) -> Result<(), RunError> {
-  let listener = TcpListener::bind("localhost:8999")?;
-  loop {
-    let (mut stream, addr) = listener.accept()?;
-    let mut contents = "".to_string();
-    stream.read_to_string(&mut contents)?;
-    println!("read contents {}", contents);
-  }
+  Ok(server::listen(server::Config { port, device_addrs })?)
 }
 
 fn watch(
   sync_path: PathBuf,
   device_addrs: Vec<String>,
 ) -> Result<(), RunError> {
+  let mut device_clients = HashMap::new();
+  for addr in device_addrs {
+    device_clients.insert(addr.clone(), Client::new(addr));
+  }
   let mut hotwatch = Hotwatch::new()?;
-  hotwatch.watch(sync_path, move |event| {
+  hotwatch.watch(sync_path.clone(), move |event| {
     match event {
       Event::Rename(from_path, to_path) => {
         println!("file renamed: from {:?}, to {:?}", from_path, to_path)
       }
       Event::Create(path) => {
         println!("file created: {:?}", path);
+        let relative_path =
+          pathdiff::diff_paths(path.clone(), sync_path.clone())
+            .expect("failed to diff paths");
         let contents = read_to_string(path).unwrap();
-        println!("contents of file: {}", contents);
-        for addr in device_addrs.iter() {
-          let mut stream = TcpStream::connect(addr).unwrap();
-          stream.write_all(contents.as_bytes()).unwrap();
-          println!("file written to network");
+        for client in device_clients.values_mut() {
+          let request = Request::put(relative_path.clone(), contents.clone());
+          client.make_request(request).expect("request failed");
         }
       }
       Event::Write(path) => println!("file written: {:?}", path),
-      Event::Remove(path) => println!("file removed: {:?}", path),
+      Event::Remove(path) => {
+        println!("file removed: {:?}", path);
+        let relative_path = pathdiff::diff_paths(path, sync_path.clone())
+          .expect("failed to diff paths");
+        for client in device_clients.values_mut() {
+          let request = Request::del(relative_path.clone());
+          client.make_request(request).expect("request failed");
+        }
+      }
       _ => {}
     }
     Flow::Continue

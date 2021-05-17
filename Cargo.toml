@@ -6,5 +6,6 @@ edition = "2018"
 
 [dependencies]
 hotwatch = "0.4.5"
+pathdiff = "0.2"
 structopt = "0.3"
 thiserror = "1.0"
