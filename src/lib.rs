@@ -76,7 +76,7 @@ fn watch(
       Event::Rename(from_path, to_path) => {
         println!("file renamed: from {:?}, to {:?}", from_path, to_path)
       }
-      Event::Create(path) => {
+      Event::Create(path) | Event::Write(path) => {
         println!("file created: {:?}", path);
         let relative_path =
           pathdiff::diff_paths(path.clone(), sync_path.clone())
@@ -87,7 +87,6 @@ fn watch(
           client.make_request(request).expect("request failed");
         }
       }
-      Event::Write(path) => println!("file written: {:?}", path),
       Event::Remove(path) => {
         println!("file removed: {:?}", path);
         let relative_path = pathdiff::diff_paths(path, sync_path.clone())
