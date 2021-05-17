@@ -117,10 +117,6 @@ impl Client {
     Ok(())
   }
 
-  pub fn addr(&self) -> &str {
-    self.addr.as_str()
-  }
-
   fn attempt_connect(&mut self) -> io::Result<()> {
     self.stream = Some(TcpStream::connect(&self.addr)?);
     Ok(())

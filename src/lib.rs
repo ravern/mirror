@@ -1,10 +1,5 @@
 use std::{
-  collections::HashMap,
-  fs::read_to_string,
-  io::{self, Write},
-  net::TcpStream,
-  path::PathBuf,
-  thread,
+  collections::HashMap, fs::read_to_string, io, path::PathBuf, thread,
 };
 
 use hotwatch::{
@@ -45,7 +40,7 @@ pub enum RunError {
 pub fn run() -> Result<(), RunError> {
   let Config {
     sync_path,
-    index_path,
+    index_path: _,
     port,
     device_addrs,
   } = Config::from_args();
