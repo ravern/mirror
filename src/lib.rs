@@ -79,7 +79,7 @@ fn watch(
         let contents = read_to_string(path).unwrap();
         for client in device_clients.values_mut() {
           let request = Request::put(relative_path.clone(), contents.clone());
-          client.make_request(request).expect("request failed");
+          client.request(request).expect("request failed");
         }
       }
       Event::Remove(path) => {
@@ -88,7 +88,7 @@ fn watch(
           .expect("failed to diff paths");
         for client in device_clients.values_mut() {
           let request = Request::del(relative_path.clone());
-          client.make_request(request).expect("request failed");
+          client.request(request).expect("request failed");
         }
       }
       _ => {}

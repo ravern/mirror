@@ -22,12 +22,28 @@ pub enum RequestParseError {
   InvalidCode(u8),
 }
 
+#[derive(Debug, Error)]
+pub enum RequestWriteError {
+  #[error("{0}")]
+  Io(#[from] io::Error),
+  #[error("failed to serialize os string: {0:?}")]
+  OsString(OsString),
+}
+
 pub enum Request {
   Put { path: PathBuf, contents: String },
   Del { path: PathBuf },
 }
 
 impl Request {
+  pub fn put(path: PathBuf, contents: String) -> Request {
+    Request::Put { path, contents }
+  }
+
+  pub fn del(path: PathBuf) -> Request {
+    Request::Del { path }
+  }
+
   pub fn parse<R>(reader: &mut R) -> Result<Request, RequestParseError>
   where
     R: Read,
@@ -70,14 +86,43 @@ impl Request {
     }
   }
 
-  pub fn put(path: PathBuf, contents: String) -> Request {
-    Request::Put { path, contents }
-  }
+  pub fn write<W>(self, writer: &mut W) -> Result<(), RequestWriteError>
+  where
+    W: Write,
+  {
+    match self {
+      Request::Put { path, contents } => {
+        let path_string = path
+          .as_os_str()
+          .to_os_string()
+          .into_string()
+          .map_err(RequestWriteError::OsString)?;
+        writer.write(&[CODE_PUT])?;
+        writer.write(&path_string.as_bytes().len().to_le_bytes())?;
+        writer.write(path_string.as_bytes())?;
+        writer.write(&contents.as_bytes().len().to_le_bytes())?;
+        writer.write(&contents.as_bytes())?;
+        writer.flush()?;
+      }
+      Request::Del { path } => {
+        let path_string = path
+          .as_os_str()
+          .to_os_string()
+          .into_string()
+          .map_err(RequestWriteError::OsString)?;
+        writer.write(&[CODE_DEL])?;
+        writer.write(&path_string.as_bytes().len().to_le_bytes())?;
+        writer.write(path_string.as_bytes())?;
+        writer.flush()?;
+      }
+    }
 
-  pub fn del(path: PathBuf) -> Request {
-    Request::Del { path }
+    Ok(())
   }
 }
+
+#[derive(Debug, Error)]
+pub enum RequestError {}
 
 pub struct Client {
   addr: String,
@@ -89,36 +134,17 @@ impl Client {
     Client { addr, stream: None }
   }
 
-  pub fn make_request(&mut self, request: Request) -> io::Result<()> {
+  pub fn request(&mut self, request: Request) -> Result<(), RequestWriteError> {
     self.attempt_connect()?;
     let stream = self.stream.as_mut().unwrap();
-
-    match request {
-      Request::Put { path, contents } => {
-        let path_string =
-          path.as_os_str().to_os_string().into_string().unwrap();
-        stream.write(&[CODE_PUT])?;
-        stream.write(&path_string.as_bytes().len().to_le_bytes())?;
-        stream.write(path_string.as_bytes())?;
-        stream.write(&contents.as_bytes().len().to_le_bytes())?;
-        stream.write(&contents.as_bytes())?;
-        stream.flush()?;
-      }
-      Request::Del { path } => {
-        let path_string =
-          path.as_os_str().to_os_string().into_string().unwrap();
-        stream.write(&[CODE_DEL])?;
-        stream.write(&path_string.as_bytes().len().to_le_bytes())?;
-        stream.write(path_string.as_bytes())?;
-        stream.flush()?;
-      }
-    }
-
+    request.write(stream)?;
     Ok(())
   }
 
   fn attempt_connect(&mut self) -> io::Result<()> {
-    self.stream = Some(TcpStream::connect(&self.addr)?);
+    if self.stream.is_none() {
+      self.stream = Some(TcpStream::connect(&self.addr)?);
+    }
     Ok(())
   }
 }
