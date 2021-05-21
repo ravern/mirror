@@ -1,8 +1,16 @@
-use std::{io, path::PathBuf, thread};
+use std::{
+  io,
+  path::PathBuf,
+  sync::{Arc, Mutex},
+  thread,
+};
 
 use structopt::StructOpt;
 use thiserror::Error;
 
+use crate::index::Index;
+
+mod index;
 mod net;
 mod server;
 mod watcher;
@@ -35,21 +43,29 @@ pub fn run() -> Result<(), RunError> {
     port,
     device_addrs,
   } = Config::from_args();
+  let index = Arc::new(Mutex::new(Index::new()));
 
   let device_addrs_clone = device_addrs.clone();
   let sync_path_clone = sync_path.clone();
+  let index_clone = index.clone();
 
   thread::spawn(move || {
-    watcher::watch(watcher::Config {
-      sync_path: sync_path_clone,
-      device_addrs: device_addrs_clone,
-    })
+    watcher::watch(
+      index_clone,
+      watcher::Config {
+        sync_path: sync_path_clone,
+        device_addrs: device_addrs_clone,
+      },
+    )
     .unwrap()
   });
 
-  Ok(server::listen(server::Config {
-    sync_path,
-    port,
-    device_addrs,
-  })?)
+  Ok(server::listen(
+    index,
+    server::Config {
+      sync_path,
+      port,
+      device_addrs,
+    },
+  )?)
 }
