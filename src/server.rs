@@ -26,7 +26,12 @@ pub struct Config {
   pub device_addrs: Vec<String>,
 }
 
-pub fn handle(index: Arc<Mutex<Index>>, config: Config, mut stream: TcpStream) {
+pub fn handle(
+  index: Arc<Mutex<Index>>,
+  config: Config,
+  device_addr: String,
+  mut stream: TcpStream,
+) {
   match Request::parse(&mut stream).expect("parse request failed") {
     Request::Put { path, contents } => {
       println!("PUT {:?} {}", path, contents);
@@ -34,7 +39,7 @@ pub fn handle(index: Arc<Mutex<Index>>, config: Config, mut stream: TcpStream) {
       absolute_path.push(path.clone());
       fs::write(absolute_path, contents.clone()).expect("failed to write file");
       index.lock().unwrap().push(Operation::create(
-        "".to_string(),
+        device_addr,
         path,
         contents,
       ));
@@ -47,7 +52,7 @@ pub fn handle(index: Arc<Mutex<Index>>, config: Config, mut stream: TcpStream) {
       index
         .lock()
         .unwrap()
-        .push(Operation::remove("".to_string(), path));
+        .push(Operation::remove(device_addr, path));
     }
   }
 }
@@ -60,7 +65,10 @@ pub fn listen(index: Arc<Mutex<Index>>, config: Config) -> Result<(), Error> {
     if is_device(&config.device_addrs, addr)? {
       let index_clone = index.clone();
       let config_clone = config.clone();
-      thread::spawn(move || handle(index_clone, config_clone, stream));
+      let device_addr = format!("{}", addr.ip());
+      thread::spawn(move || {
+        handle(index_clone, config_clone, device_addr, stream)
+      });
     } else {
       println!("not in device list. blocked!")
     }

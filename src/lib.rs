@@ -31,8 +31,6 @@ struct Config {
 #[derive(Debug, Error)]
 pub enum RunError {
   #[error("{0}")]
-  Io(#[from] io::Error),
-  #[error("{0}")]
   Server(#[from] server::Error),
 }
 

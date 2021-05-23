@@ -1,16 +1,5 @@
 use std::path::PathBuf;
 
-#[derive(Debug, PartialEq)]
-pub enum OperationKind {
-  Create {
-    path: PathBuf,
-    contents: String, // TODO: Use a hash of contents instead.
-  },
-  Remove {
-    path: PathBuf,
-  },
-}
-
 pub struct Index {
   ops: Vec<Operation>,
 }
@@ -21,7 +10,7 @@ impl Index {
   }
 
   pub fn push(&mut self, op: Operation) {
-    self.ops.push(dbg!(op));
+    self.ops.push(op);
   }
 
   pub fn find(&self, op_kind: OperationKind) -> Option<&Operation> {
@@ -53,4 +42,15 @@ impl Operation {
       kind: OperationKind::Remove { path },
     }
   }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum OperationKind {
+  Create {
+    path: PathBuf,
+    contents: String, // TODO: Use a hash of contents instead.
+  },
+  Remove {
+    path: PathBuf,
+  },
 }

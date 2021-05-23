@@ -68,7 +68,7 @@ pub fn handle_create_or_write(
   }
 
   index.lock().unwrap().push(Operation::create(
-    "".to_string(),
+    "127.0.0.1".to_string(),
     relative_path,
     contents,
   ));
@@ -103,7 +103,7 @@ pub fn handle_remove(
   index
     .lock()
     .unwrap()
-    .push(Operation::remove("".to_string(), relative_path));
+    .push(Operation::remove("127.0.0.1".to_string(), relative_path));
 }
 
 pub fn watch(
