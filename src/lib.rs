@@ -1,5 +1,4 @@
 use std::{
-  io,
   path::PathBuf,
   sync::{Arc, Mutex},
   thread,
