@@ -1,3 +1,5 @@
+**_This is a work in progress._**
+
 # Mirror
 
 Mirror syncs the contents of two directories together across multiple devices. Any files or directories created, modified or removed while Mirror is active will be performed on the rest of the devices.
